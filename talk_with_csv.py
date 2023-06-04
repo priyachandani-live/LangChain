@@ -63,5 +63,75 @@ def ask_agent(agent, query):
     response = agent.run(prompt)
     return str(response)
 
-def decode_respone(response:str):
+#
+def decode_response(response:str) -> dict:
     return json.loads(response)
+
+#
+def write_answer(response_dict:dict):
+   """
+   Write a response from an agent to a Streamlit app.
+
+   Args:
+      response_dict: The response from the agent.
+
+   Returns:
+      None.
+   """
+   # {"answer": "The Product with the highest Orders is '15143Exfo'"}
+   if "answer" in response_dict:
+      return st.write(response_dict['answer'])
+        
+   # {"bar": {"columns": ["A", "B", "C", ...], "data": [25, 24, 10, ...]}}
+   if "bar" in response_dict:
+      data = response_dict['bar'] #{"columns": ["A", "B", "C", ...], "data": [25, 24, 10, ...]}
+      try:
+         df_data = {
+            col : [x[i] if isinstance(x, list) else x for x in data['data']]
+            for i , col in enumerate(data['columns'])
+         }
+         df = pd.DataFrame(df_data)
+         df.set_index("Products", inplace=True)
+         st.bar_chart(df)
+      except ValueError:
+         print(f"Couldn't create dataframe from data: {data}")
+       
+   # {"line": {"columns": ["A", "B", "C", ...], "data": [25, 24, 10, ...]}}
+   if "line" in response_dict:
+      try:
+         df_data = {col: [x[i] for x in data['data']] for i, col in enumerate(data['columns'])}
+         df = pd.DataFrame(df_data)
+         df.set_index("Products", inplace=True)
+         st.line_chart(df)
+      except ValueError:
+         print(f"Couldn't create DataFrame from data: {data}")
+
+   if "table" in response_dict:
+        data = response_dict["table"]
+        df = pd.DataFrame(data["data"], columns=data["columns"])
+        st.table(df)
+
+
+st.set_page_config(page_title="👨‍💻 Talk with your CSV")
+st.title("👨‍💻 Talk with your CSV")
+
+st.write("Please upload your CSV file below.")
+
+data = st.file_uploader("Upload a CSV" , type="csv")
+
+query = st.text_area("Send a Message")
+
+if st.button("Submit Query", type="primary"):
+   # Create an agent from the CSV file.
+   agent = csv_tool(data)
+
+   # Query the agent.
+   response = ask_agent(agent=agent, query=query)
+
+   # Decode the response.
+   decoded_response = decode_response(response)
+
+   # Write the response to the Streamlit app.
+   write_answer(decoded_response)
+    
+   
